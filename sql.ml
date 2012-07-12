@@ -1,4 +1,5 @@
-open Core.Std
+(** @author Rok Strnisa *)
+
 open Printf
 
 let debug_fn : (string -> unit) option ref = ref None
@@ -41,6 +42,7 @@ module Type = struct
     | _ -> true
 end
 
+type tbl_name   = string
 type col_name   = string
 type col_value  = string
 type col_assign = col_name * col_value
@@ -69,32 +71,27 @@ let tbl_exists ~conn ~tbl =
     (sprintf "tablename='%s'" tbl) in
   (exec_exn ~conn ~query)#ntuples = 1
 
-module PairKey = struct
-  module T = struct
-    type t = string * string with sexp
-    type sexpable = t
-    let compare = compare
-    let equal = (=)
-    let hash = Hashtbl.hash
-  end
-  include T
-  include Hashable.Make (T)
-end
+type col_type_cache_tbl = (col_name, Type.t) Hashtbl.t
+type col_type_cache = (tbl_name, col_type_cache_tbl) Hashtbl.t
 
-let cached_types : Type.t PairKey.Table.t = PairKey.Table.create ()
+let cached_types : col_type_cache = Hashtbl.create 128
 
 let get_type ~conn ~tbl ~col_name =
-  match PairKey.Table.find cached_types (tbl, col_name) with
-  | Some ty -> ty
-  | None ->
-    let query = sprintf "SELECT * FROM %s LIMIT 1" tbl in
-    let result = exec_exn ~conn ~query in
-    for i = 0 to result#nfields - 1 do
-      let key = tbl, result#fname i in
-      let data = Type.of_pgtype (result#ftype i) in
-      PairKey.Table.replace cached_types ~key ~data;
-    done;
-    PairKey.Table.find_exn cached_types (tbl, col_name)
+  let cached_types_tbl =
+    try Hashtbl.find cached_types tbl
+    with Not_found ->
+      let query = sprintf "SELECT * FROM %s LIMIT 1" tbl in
+      let result = exec_exn ~conn ~query in
+      let num_cols = result#nfields in
+      let cached_types_tbl = Hashtbl.create num_cols in
+      Hashtbl.add cached_types tbl cached_types_tbl;
+      for i = 0 to num_cols - 1 do
+        let col_name' = result#fname i in
+        let ty = Type.of_pgtype (result#ftype i) in
+        Hashtbl.replace cached_types_tbl col_name' ty;
+      done;
+      cached_types_tbl
+  in Hashtbl.find cached_types_tbl col_name
 
 let string_of_value ~conn ~tbl ~col_name ~value =
   let ty = get_type ~conn ~tbl ~col_name in
@@ -105,19 +102,19 @@ let string_of_value ~conn ~tbl ~col_name ~value =
 let sql_values_of_tuples ~conn ~tbl ~tuples =
   let value_string_of_tuple (col_name, value) =
     string_of_value ~conn ~tbl ~col_name ~value
-  in String.concat ~sep:", " (List.map ~f:value_string_of_tuple tuples)
+  in String.concat ", " (List.map value_string_of_tuple tuples)
 
 let sql_assign_of_tuples ~conn ~tbl ~tuples =
   let pair (col_name, value) =
     let val_str = string_of_value ~conn ~tbl ~col_name ~value in
     sprintf "%s=%s" col_name val_str
-  in List.map ~f:pair tuples
+  in List.map pair tuples
 
 let sql_cond_of_tuples ~conn ~tbl ~tuples =
-  String.concat ~sep:" AND " (sql_assign_of_tuples ~conn ~tbl ~tuples)
+  String.concat " AND " (sql_assign_of_tuples ~conn ~tbl ~tuples)
 
 let sql_set_of_tuples ~conn ~tbl ~tuples =
-  String.concat ~sep:", " (sql_assign_of_tuples ~conn ~tbl ~tuples)
+  String.concat ", " (sql_assign_of_tuples ~conn ~tbl ~tuples)
 
 let update_entry ~conn ~tbl ~tuples_cond ~tuples_set =
   let cond = sql_cond_of_tuples ~conn ~tbl ~tuples:tuples_cond in
@@ -127,9 +124,18 @@ let update_entry ~conn ~tbl ~tuples_cond ~tuples_set =
   | Debug -> debug query
   | Live -> exec_ign_exn ~conn ~query
 
+let rstrip str =
+  let len = String.length str in
+  let rec aux i =
+    if i <= 0 then len else
+    if List.mem str.[i] [' '; '\t']
+    then aux (i-1) else i+1
+  in
+  String.sub str 0 (aux (len-1))
+
 let get_first_entry ~result =
   if result#nfields > 0 && result#ntuples > 0
-  then Some (String.strip (result#getvalue 0 0))
+  then Some (rstrip (result#getvalue 0 0))
   else None
 
 let get_first_entry_exn ~result =
@@ -138,7 +144,7 @@ let get_first_entry_exn ~result =
   | Some v -> v
 
 let sql_names_values_of_tuples ~conn ~tbl ~tuples =
-  let names = String.concat ~sep:"," (List.map ~f:fst tuples) in
+  let names = String.concat "," (List.map fst tuples) in
   let values = sql_values_of_tuples ~conn ~tbl ~tuples in
   sprintf "(%s) VALUES (%s)" names values
 
@@ -195,4 +201,4 @@ let insert_or_update ~conn ~tbl ~tuples_cond ~tuples_set =
     | _ -> failwith "More than one row matches query."
 
 let get_first_col ~result =
-  Array.to_list (Array.map ~f:(fun row -> row.(0)) result#get_all)
+  Array.to_list (Array.map (fun row -> row.(0)) result#get_all)
