@@ -76,25 +76,33 @@ type col_type_cache = (tbl_name, col_type_cache_tbl) Hashtbl.t
 
 let cached_types : col_type_cache = Hashtbl.create 128
 
-let get_type ~conn ~tbl ~col_name =
-  let cached_types_tbl =
-    try Hashtbl.find cached_types tbl
-    with Not_found ->
-      let query = sprintf "SELECT * FROM %s LIMIT 1" tbl in
-      let result = exec_exn ~conn ~query in
-      let num_cols = result#nfields in
-      let cached_types_tbl = Hashtbl.create num_cols in
-      Hashtbl.add cached_types tbl cached_types_tbl;
-      for i = 0 to num_cols - 1 do
-        let col_name' = result#fname i in
-        let ty = Type.of_pgtype (result#ftype i) in
-        Hashtbl.replace cached_types_tbl col_name' ty;
-      done;
-      cached_types_tbl
-  in Hashtbl.find cached_types_tbl col_name
+let get_col_types ~conn ~tbl =
+  try Hashtbl.find cached_types tbl
+  with Not_found ->
+    let query = sprintf "SELECT * FROM %s LIMIT 0" tbl in
+    let result = exec_exn ~conn ~query in
+    let num_cols = result#nfields in
+    let cached_types_tbl = Hashtbl.create num_cols in
+    Hashtbl.add cached_types tbl cached_types_tbl;
+    for i = 0 to num_cols - 1 do
+      let col_name' = result#fname i in
+      let ty = Type.of_pgtype (result#ftype i) in
+      Hashtbl.replace cached_types_tbl col_name' ty;
+    done;
+    cached_types_tbl
+
+let get_col_types_lst ~conn ~tbl =
+  let col_types = get_col_types ~conn ~tbl in
+  List.rev (Hashtbl.fold (fun n t acc -> (n, t)::acc) col_types [])
+
+let get_col_type ~conn ~tbl ~col_name =
+  Hashtbl.find (get_col_types ~conn ~tbl) col_name
+
+let get_col_names ~conn ~tbl =
+  List.map fst (get_col_types_lst ~conn ~tbl)
 
 let string_of_value ~conn ~tbl ~col_name ~value =
-  let ty = get_type ~conn ~tbl ~col_name in
+  let ty = get_col_type ~conn ~tbl ~col_name in
   match Type.is_quoted ty with
   | false -> value
   | true -> "'" ^ value ^ "'"
@@ -163,7 +171,7 @@ let ensure_inserted_get_first_col ~conn ~tbl ~tuples =
     let result = exec_exn ~conn ~query:select in
     match result#ntuples with
     | 1 ->
-      get_first_entry_exn result
+      get_first_entry_exn ~result
     | 0 ->
       let insert = match tuples with
         | [] ->
@@ -174,7 +182,7 @@ let ensure_inserted_get_first_col ~conn ~tbl ~tuples =
             sprintf "INSERT INTO %s %s" tbl values
       in
       exec_ign_exn ~conn ~query:insert;
-      get_first_entry_exn (exec_exn ~conn ~query:select)
+      get_first_entry_exn ~result:(exec_exn ~conn ~query:select)
     | _ -> failwith "More than one row matches query."
 
 let ensure_inserted_get_id ~conn ~tbl ~tuples =
@@ -200,5 +208,5 @@ let insert_or_update ~conn ~tbl ~tuples_cond ~tuples_set =
       ensure_inserted ~conn ~tbl ~tuples
     | _ -> failwith "More than one row matches query."
 
-let get_first_col ~result =
-  Array.to_list (Array.map (fun row -> row.(0)) result#get_all)
+let get_col ~result ~col =
+  Array.to_list (Array.map (fun row -> row.(col)) result#get_all)

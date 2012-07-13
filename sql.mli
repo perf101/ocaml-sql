@@ -87,9 +87,21 @@ val exec_ign_exn : conn:conn -> query:string -> unit
  * in the database. *)
 val tbl_exists : conn:conn -> tbl:string -> bool
 
-(** [get_type conn tbl col_name] obtains the SQL type corresponding to the
+(** [get_col_types conn tbl] obtains a map from column names of table [tbl] to
+ * corresponding SQL types. The results are cached. *)
+val get_col_types : conn:conn -> tbl:string -> (col_name, Type.t) Hashtbl.t
+
+(** [get_col_types_lst conn tbl] obtains an association list from column names
+ * of table [tbl] to corresponding SQL types. The results are cached. *)
+val get_col_types_lst : conn:conn -> tbl:string -> (col_name * Type.t) list
+
+(** [get_col_type conn tbl col_name] obtains the SQL type corresponding to the
  * [col_name] of table [tbl]. The results are cached. *)
-val get_type : conn:conn -> tbl:string -> col_name:col_name -> Type.t
+val get_col_type : conn:conn -> tbl:string -> col_name:col_name -> Type.t
+
+(** [get_col_names conn tbl] obtains the list of column names in the table
+ * named [tbl].*)
+val get_col_names : conn:conn -> tbl:string -> col_name list
 
 (** [update_entry conn tbl tuples_cond tuples_set] updates a row in table
  * [tbl] with column assignments [tuples_cond], modifying columns as specified
@@ -134,6 +146,6 @@ val ensure_inserted : conn:conn -> tbl:string -> tuples:col_assign list -> unit
 val insert_or_update : conn:conn -> tbl:string ->
   tuples_cond:col_assign list -> tuples_set:col_assign list -> unit
 
-(** [get_first_col result] returns the values of the first column for all rows
- * in [result]. The command fails if [result] has no columns. *)
-val get_first_col : result:result -> col_value list
+(** [get_col result col] returns the values of [col]-th column for all rows
+ * in [result]. Counting starts with 0. *)
+val get_col : result:result -> col:int -> col_value list
