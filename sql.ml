@@ -31,7 +31,7 @@ module Type = struct
 
   let string_of = function
     | Boolean -> "boolean"
-    | Double -> "double"
+    | Double -> "double precision"
     | Integer -> "integer"
     | Varchar sz -> sprintf "character varying(%d)" sz
     | VarcharUnknown -> failwith "string_of_sql_type: VarcharUnknown"
