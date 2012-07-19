@@ -118,7 +118,7 @@ let sql_values_of_tuples ~conn ~tbl ~tuples =
 let sql_assign_of_tuples ~conn ~tbl ~tuples =
   let pair (col_name, value) =
     let val_str = string_of_value ~conn ~tbl ~col_name ~value in
-    sprintf "%s=%s" col_name val_str
+    sprintf "\"%s\"=%s" col_name val_str
   in List.map pair tuples
 
 let sql_cond_of_tuples ~conn ~tbl ~tuples =
@@ -154,8 +154,11 @@ let get_first_entry_exn ~result =
   | None -> failwith "get_first_entry_exn"
   | Some v -> v
 
+let sql_names_of_tuples ~tuples =
+  String.concat "," (List.map (fun (n, _) -> "\"" ^ n ^ "\"") tuples)
+
 let sql_names_values_of_tuples ~conn ~tbl ~tuples =
-  let names = String.concat "," (List.map fst tuples) in
+  let names = sql_names_of_tuples ~tuples in
   let values = sql_values_of_tuples ~conn ~tbl ~tuples in
   sprintf "(%s) VALUES (%s)" names values
 
