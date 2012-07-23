@@ -31,7 +31,7 @@ module Type = struct
 
   let string_of = function
     | Boolean -> "boolean"
-    | Double -> "double"
+    | Double -> "double precision"
     | Integer -> "integer"
     | Varchar sz -> sprintf "character varying(%d)" sz
     | VarcharUnknown -> failwith "string_of_sql_type: VarcharUnknown"
@@ -96,7 +96,10 @@ let get_col_types_lst ~conn ~tbl =
   List.rev (Hashtbl.fold (fun n t acc -> (n, t)::acc) col_types [])
 
 let get_col_type ~conn ~tbl ~col_name =
-  Hashtbl.find (get_col_types ~conn ~tbl) col_name
+  try Hashtbl.find (get_col_types ~conn ~tbl) col_name
+  with Not_found ->
+    debug (sprintf "Column '%s' not found in table %s" col_name tbl);
+    raise Not_found
 
 let get_col_names ~conn ~tbl =
   List.map fst (get_col_types_lst ~conn ~tbl)
