@@ -38,7 +38,7 @@ module Type = struct
     | Text -> "text"
 
   let is_quoted = function
-    | Boolean | Double | Integer -> false
+    | Double | Integer -> false
     | _ -> true
 end
 
