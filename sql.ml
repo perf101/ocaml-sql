@@ -162,14 +162,15 @@ let sql_names_values_of_tuples ~conn ~tbl ~tuples =
   let values = sql_values_of_tuples ~conn ~tbl ~tuples in
   sprintf "(%s) VALUES (%s)" names values
 
-let select ~conn ~tbl ~tuples =
-  let select = match tuples with
+let select_query ~conn ~tbl ~tuples =
+  match tuples with
     | [] -> sprintf "SELECT * FROM %s" tbl
     | _ ->
       let cond = sql_cond_of_tuples ~conn ~tbl ~tuples in
       sprintf "SELECT * FROM %s WHERE %s" tbl cond
-  in
-  exec_exn ~conn ~query:select
+
+let select_exn ~conn ~tbl ~tuples =
+  exec_exn ~conn ~query:(select_query ~conn ~tbl ~tuples)
 
 let insert_get_first_col ~conn ~tbl ~tuples =
   let insert = match tuples with
@@ -180,7 +181,8 @@ let insert_get_first_col ~conn ~tbl ~tuples =
       let values = sql_names_values_of_tuples ~conn ~tbl ~tuples in
       sprintf "INSERT INTO %s %s" tbl values
   in
-  let result = exec_exn ~conn ~query:(insert ^ "; SELECT lastval()") in
+  let select = select_query ~conn ~tbl ~tuples in
+  let result = exec_exn ~conn ~query:(insert ^ ";" ^ select) in
   get_first_entry_exn ~result
 
 let ensure_inserted_get_first_col ~conn ~tbl ~tuples =
@@ -189,7 +191,7 @@ let ensure_inserted_get_first_col ~conn ~tbl ~tuples =
     debug (sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples));
     "-1"
   | Live ->
-    let result = select ~conn ~tbl ~tuples in
+    let result = select_exn ~conn ~tbl ~tuples in
     match result#ntuples with
     | 0 -> insert_get_first_col ~conn ~tbl ~tuples
     | 1 -> get_first_entry_exn ~result
@@ -213,7 +215,7 @@ let insert_or_update ~conn ~tbl ~tuples_cond ~tuples_set =
     let tuples = combine_cond_and_set_tuples ~tuples_cond ~tuples_set in
     debug (sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples))
   | Live ->
-    let result = select ~conn ~tbl ~tuples:tuples_cond in
+    let result = select_exn ~conn ~tbl ~tuples:tuples_cond in
     match result#ntuples with
     | 1 -> update_entry ~conn ~tbl ~tuples_cond ~tuples_set
     | 0 ->
