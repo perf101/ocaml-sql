@@ -162,33 +162,37 @@ let sql_names_values_of_tuples ~conn ~tbl ~tuples =
   let values = sql_values_of_tuples ~conn ~tbl ~tuples in
   sprintf "(%s) VALUES (%s)" names values
 
+let select ~conn ~tbl ~tuples =
+  let select = match tuples with
+    | [] -> sprintf "SELECT * FROM %s" tbl
+    | _ ->
+      let cond = sql_cond_of_tuples ~conn ~tbl ~tuples in
+      sprintf "SELECT * FROM %s WHERE %s" tbl cond
+  in
+  exec_exn ~conn ~query:select
+
+let insert_get_first_col ~conn ~tbl ~tuples =
+  let insert = match tuples with
+    | [] ->
+      (* There's only one column in the table: the (serial) ID column. *)
+      sprintf "INSERT INTO %s VALUES (DEFAULT)" tbl
+    | _ ->
+      let values = sql_names_values_of_tuples ~conn ~tbl ~tuples in
+      sprintf "INSERT INTO %s %s" tbl values
+  in
+  let result = exec_exn ~conn ~query:(insert ^ "; SELECT lastval()") in
+  get_first_entry_exn ~result
+
 let ensure_inserted_get_first_col ~conn ~tbl ~tuples =
-  let d = sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples) in
   match !mode with
   | Debug ->
-    debug d; "-1"
+    debug (sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples));
+    "-1"
   | Live ->
-    let select = match tuples with
-      | [] -> sprintf "SELECT * FROM %s" tbl
-      | _ ->
-          let cond = sql_cond_of_tuples ~conn ~tbl ~tuples in
-          sprintf "SELECT * FROM %s WHERE %s" tbl cond
-    in
-    let result = exec_exn ~conn ~query:select in
+    let result = select ~conn ~tbl ~tuples in
     match result#ntuples with
-    | 1 ->
-      get_first_entry_exn ~result
-    | 0 ->
-      let insert = match tuples with
-        | [] ->
-            (* There's only one column in the table: the (serial) ID column. *)
-            sprintf "INSERT INTO %s VALUES (DEFAULT)" tbl
-        | _ ->
-            let values = sql_names_values_of_tuples ~conn ~tbl ~tuples in
-            sprintf "INSERT INTO %s %s" tbl values
-      in
-      exec_ign_exn ~conn ~query:insert;
-      get_first_entry_exn ~result:(exec_exn ~conn ~query:select)
+    | 0 -> insert_get_first_col ~conn ~tbl ~tuples
+    | 1 -> get_first_entry_exn ~result
     | _ -> failwith "More than one row matches query."
 
 let ensure_inserted_get_id ~conn ~tbl ~tuples =
@@ -197,20 +201,23 @@ let ensure_inserted_get_id ~conn ~tbl ~tuples =
 let ensure_inserted ~conn ~tbl ~tuples =
   ignore (ensure_inserted_get_first_col ~conn ~tbl ~tuples)
 
+let combine_cond_and_set_tuples ~tuples_cond ~tuples_set =
+  let names_set = List.map fst tuples_set in
+  let tuples_cond_filtered =
+    List.filter (fun (n, _) -> not (List.mem n names_set)) tuples_cond in
+  tuples_cond_filtered @ tuples_set
+
 let insert_or_update ~conn ~tbl ~tuples_cond ~tuples_set =
-  let tuples = tuples_cond @ tuples_set in
-  let d = sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples) in
   match !mode with
   | Debug ->
-    debug d
+    let tuples = combine_cond_and_set_tuples ~tuples_cond ~tuples_set in
+    debug (sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples))
   | Live ->
-    let cond = sql_cond_of_tuples ~conn ~tbl ~tuples:tuples_cond in
-    let select = sprintf "SELECT * FROM %s WHERE %s" tbl cond in
-    let result = exec_exn ~conn ~query:select in
+    let result = select ~conn ~tbl ~tuples:tuples_cond in
     match result#ntuples with
-    | 1 ->
-      update_entry ~conn ~tbl ~tuples_cond ~tuples_set
+    | 1 -> update_entry ~conn ~tbl ~tuples_cond ~tuples_set
     | 0 ->
+      let tuples = combine_cond_and_set_tuples ~tuples_cond ~tuples_set in
       ensure_inserted ~conn ~tbl ~tuples
     | _ -> failwith "More than one row matches query."
 
