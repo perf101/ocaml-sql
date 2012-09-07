@@ -10,6 +10,8 @@ let mode : mode_ty ref = ref Live
 
 let show_sql : bool ref = ref false
 
+let time_queries : bool ref = ref false
+
 module Type = struct
   type t =
     | Boolean
@@ -53,7 +55,12 @@ type result     = Postgresql.result
 
 let exec ~(conn : conn) ~query =
   if !show_sql then debug query;
+  let start_time = if !time_queries then Unix.gettimeofday () else 0. in
   let result = conn#exec query in
+  if !time_queries then (
+    let elapsed_time = Unix.gettimeofday () -. start_time in
+    debug (sprintf "The query took %fs." elapsed_time)
+  );
   match result#status with
     | Postgresql.Command_ok | Postgresql.Tuples_ok -> Some result
     | _ -> debug conn#error_message; None

@@ -18,6 +18,11 @@ val mode : mode_ty ref
  * even in [Debug] mode. By default, SQL queries are not shown. *)
 val show_sql : bool ref
 
+(** Use [time_queries := true] to display execution time for SQL queries;
+ * timings are shown even if [show_sql] is [false]. By default, [time_queries]
+ * is [false]. *)
+val time_queries : bool ref
+
 (** An abstraction of the underlying database type. *)
 module Type :
   sig
