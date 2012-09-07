@@ -12,6 +12,8 @@ let show_sql : bool ref = ref false
 
 let time_queries : bool ref = ref false
 
+let ignore_limit_0 : bool ref = ref false
+
 module Type = struct
   type t =
     | Boolean
@@ -53,14 +55,22 @@ type col_init   = col_name * col_value * Type.t
 type conn       = Postgresql.connection
 type result     = Postgresql.result
 
+let limit_0 = " LIMIT 0"
+let limit_0_len = String.length limit_0
+
+let is_limit_0 ~query =
+  limit_0 = String.sub query (String.length query - limit_0_len) limit_0_len
+
+let output_timing ~start_time =
+  let elapsed_time = Unix.gettimeofday () -. start_time in
+  debug (sprintf "The query took %fs." elapsed_time)
+
 let exec ~(conn : conn) ~query =
-  if !show_sql then debug query;
-  let start_time = if !time_queries then Unix.gettimeofday () else 0. in
+  let show = not (!ignore_limit_0 && is_limit_0 ~query) in
+  if show && !show_sql then debug query;
+  let start_time = if show && !time_queries then Unix.gettimeofday () else 0. in
   let result = conn#exec query in
-  if !time_queries then (
-    let elapsed_time = Unix.gettimeofday () -. start_time in
-    debug (sprintf "The query took %fs." elapsed_time)
-  );
+  if show && !time_queries then output_timing ~start_time;
   match result#status with
     | Postgresql.Command_ok | Postgresql.Tuples_ok -> Some result
     | _ -> debug conn#error_message; None

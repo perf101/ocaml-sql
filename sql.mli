@@ -23,6 +23,12 @@ val show_sql : bool ref
  * is [false]. *)
 val time_queries : bool ref
 
+(** Use [ignore_limit_0 := true] to not display any debug output for queries
+ * that end with " LIMIT 0". These queries are used by the module to find
+ * column types. The setting is relevant for [show_sql] and [time_queries]. By
+ * default, [ignore_limit_0] is [false]. *)
+val ignore_limit_0 : bool ref
+
 (** An abstraction of the underlying database type. *)
 module Type :
   sig
