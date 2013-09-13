@@ -135,7 +135,7 @@ let sql_values_of_tuples ~conn ~tbl ~tuples =
 let sql_assign_of_tuples ~conn ~tbl ~tuples =
   let pair (col_name, value) =
     let val_str = string_of_value ~conn ~tbl ~col_name ~value in
-    sprintf "\"%s\"=%s" col_name val_str
+    sprintf "\"%s\"%s%s" col_name (if val_str="NULL" then " is " else "=") val_str
   in List.map pair tuples
 
 let sql_cond_of_tuples ~conn ~tbl ~tuples =
