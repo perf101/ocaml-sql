@@ -19,6 +19,7 @@ module Type = struct
     | Boolean
     | Double
     | Integer
+    | LongInt
     | Varchar of int
     | VarcharUnknown
     | Text
@@ -26,6 +27,7 @@ module Type = struct
   let of_pgtype = function
     | Postgresql.BOOL -> Boolean
     | Postgresql.INT4 -> Integer
+    | Postgresql.INT8 -> LongInt
     | Postgresql.FLOAT8 -> Double
     | Postgresql.TEXT -> Text
     | Postgresql.VARCHAR -> VarcharUnknown
@@ -37,12 +39,13 @@ module Type = struct
     | Boolean -> "boolean"
     | Double -> "double precision"
     | Integer -> "integer"
+    | LongInt -> "bigint"
     | Varchar sz -> sprintf "character varying(%d)" sz
     | VarcharUnknown -> failwith "string_of_sql_type: VarcharUnknown"
     | Text -> "text"
 
   let is_quoted = function
-    | Double | Integer -> false
+    | Double | Integer | LongInt -> false
     | _ -> true
 end
 

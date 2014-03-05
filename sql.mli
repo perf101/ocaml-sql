@@ -36,6 +36,7 @@ module Type :
         Boolean
       | Double
       | Integer
+      | LongInt
       | Varchar of int
       | VarcharUnknown
       | Text
