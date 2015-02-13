@@ -127,8 +127,17 @@ let get_col_names ~conn ~tbl =
 let escape_single_quotes str =
   Str.global_replace (Str.regexp "'") "''" str
 
+let check_value ~ty ~value =
+  match ty with
+  | Type.Double ->
+      if List.mem value ["inf";"-inf";"nan";"-nan"]
+        then failwith (sprintf "Can't represent float value '%s'" value)
+        else ()
+  | _ -> ()
+
 let string_of_value ~conn ~tbl ~col_name ~value =
   let ty = get_col_type ~conn ~tbl ~col_name in
+  check_value ~ty ~value;
   match Type.is_quoted ty with
   | false -> if value="None" then "NULL" else value
   | true -> "'" ^ (escape_single_quotes value) ^ "'"
