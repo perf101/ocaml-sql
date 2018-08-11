@@ -1,0 +1,5 @@
+(library
+ (name sql)
+ (libraries postgresql)
+ (flags (:standard -w @a-4-6-9-27-28-29))
+ (wrapped false))
