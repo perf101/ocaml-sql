@@ -124,9 +124,6 @@ let get_col_type ~conn ~tbl ~col_name =
 let get_col_names ~conn ~tbl =
   List.map fst (get_col_types_lst ~conn ~tbl)
 
-let escape_single_quotes str =
-  Str.global_replace (Str.regexp "'") "''" str
-
 let check_value ~ty ~value =
   match ty with
   | Type.Double ->
@@ -140,7 +137,7 @@ let string_of_value ~conn ~tbl ~col_name ~value =
   check_value ~ty ~value;
   match Type.is_quoted ty with
   | false -> if value="None" then "NULL" else value
-  | true -> "'" ^ (escape_single_quotes value) ^ "'"
+  | true -> conn#escape_string value
 
 let sql_values_of_tuples ~conn ~tbl ~tuples =
   let value_string_of_tuple (col_name, value) =
