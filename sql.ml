@@ -68,20 +68,25 @@ let output_timing ~start_time =
   let elapsed_time = Unix.gettimeofday () -. start_time in
   debug (sprintf "The query took %fs." elapsed_time)
 
-let exec ~(conn : conn) ~query =
+let exec_result ~(conn : conn) ~query =
   let show = not (!ignore_limit_0 && is_limit_0 ~query) in
   if show && !show_sql then debug query;
   let start_time = if show && !time_queries then Unix.gettimeofday () else 0. in
   let result = conn#exec query in
   if show && !time_queries then output_timing ~start_time;
   match result#status with
-    | Postgresql.Command_ok | Postgresql.Tuples_ok -> Some result
-    | _ -> debug conn#error_message; None
+    | Postgresql.Command_ok | Postgresql.Tuples_ok -> Ok result
+    | _ -> debug conn#error_message; Error (conn#error_message)
 
 let exec_exn ~conn ~query =
-  match exec ~conn ~query with
-  | None -> failwith ("Failed to execute query: " ^ query)
-  | Some result -> result
+  match exec_result ~conn ~query with
+  | Error msg -> failwith (Printf.sprintf "Failed to execute query: %s\n%s" msg query)
+  | Ok result -> result
+
+let exec ~conn ~query =
+    match exec_result ~conn ~query with
+    | Ok r -> Some r
+    | Error _ -> None
 
 let exec_ign_exn ~conn ~query =
   ignore (exec_exn ~conn ~query)
