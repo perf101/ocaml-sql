@@ -40,6 +40,8 @@ module Type :
       | Varchar of int
       | VarcharUnknown
       | Text
+      | Macaddr
+      | Jsonb
 
     (** [of_pgtype fty] convert PostgreSQL database type [fty] to [t], or fails
      * if no suitable [t] exists. *)

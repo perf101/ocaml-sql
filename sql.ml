@@ -23,6 +23,8 @@ module Type = struct
     | Varchar of int
     | VarcharUnknown
     | Text
+    | Macaddr
+    | Jsonb
 
   let of_pgtype = function
     | Postgresql.BOOL -> Boolean
@@ -31,6 +33,8 @@ module Type = struct
     | Postgresql.FLOAT8 -> Double
     | Postgresql.TEXT -> Text
     | Postgresql.VARCHAR -> VarcharUnknown
+    | Postgresql.MACADDR -> Macaddr
+    | Postgresql.JSONB -> Jsonb
     | pgtype ->
       let pgtype_str = Postgresql.string_of_ftype pgtype in
       failwith (sprintf "sql_type_of_ftype: %s" pgtype_str)
@@ -43,6 +47,8 @@ module Type = struct
     | Varchar sz -> sprintf "character varying(%d)" sz
     | VarcharUnknown -> failwith "string_of_sql_type: VarcharUnknown"
     | Text -> "text"
+    | Macaddr -> "macaddr"
+    | Jsonb -> "jsonb"
 
   let is_quoted = function
     | Double | Integer | LongInt -> false
