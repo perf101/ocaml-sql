@@ -134,24 +134,36 @@ val get_first_entry : result:result -> col_value option
  * exception is thrown where [None] was returned. *)
 val get_first_entry_exn : result:result -> col_value
 
-(** [ensure_inserted_get_first_col conn tbl tuples] ensures that a row
- * specified with [tuples] exists within table [tbl], i.e. the row is inserted
+(** [ensure_inserted_get_first_col conn tbl tuples_cond tuples_set] ensures that a row
+ * specified with [tuples_cond] exists within table [tbl], i.e. the row is inserted
  * if missing. The first column (often the generated unique identifier of the
- * row) is returned. Note that [tuples] only needs to contain non-optional
+ * row) is returned. Note that [tuples_set] only needs to contain non-optional
  * column assignments --- this is true for all similar functions below. *)
 val ensure_inserted_get_first_col : conn:conn -> tbl:string ->
-  tuples:col_assign list -> col_value
+  tuples_cond:col_assign list -> tuples_set:col_assign list -> col_value
 
-(** [ensure_inserted_get_id conn tbl tuples] performs the same function as
+(** [condisset_ensure_inserted_get_id conn tbl tuples] performs the same function as
+ * [ensure_inserted_get_first_col conn tbl tuples tuples], except that it also
+ * converts the returned value to an interger. *)
+val condisset_ensure_inserted_get_id : conn:conn -> tbl:string ->
+  tuples:col_assign list -> int
+
+(** [condisset_ensure_inserted conn tbl tuples tuples] performs the same function as
+ * [ensure_inserted_get_first_col conn tbl tuples], except that it does not
+ * return any values. *)
+val condisset_ensure_inserted : conn:conn -> tbl:string -> tuples:col_assign list -> unit
+
+(** [ensure_inserted_get_id conn tbl tuples_cond tuples_set] performs the same function as
  * [ensure_inserted_get_first_col conn tbl tuples], except that it also
  * converts the returned value to an interger. *)
 val ensure_inserted_get_id : conn:conn -> tbl:string ->
-  tuples:col_assign list -> int
+  tuples_cond:col_assign list -> tuples_set:col_assign list -> int
 
-(** [ensure_inserted conn tbl tuples] performs the same function as
+(** [ensure_inserted conn tbl tuples_cond tuples_set] performs the same function as
  * [ensure_inserted_get_first_col conn tbl tuples], except that it does not
  * return any values. *)
-val ensure_inserted : conn:conn -> tbl:string -> tuples:col_assign list -> unit
+val ensure_inserted : conn:conn -> tbl:string ->
+  tuples_cond:col_assign list -> tuples_set:col_assign list -> unit
 
 (** [insert_or_update conn tbl tuples_cond tuples_set] performs the same
  * function as [update_entry conn tbl tuples_cond tuples_set], except that it

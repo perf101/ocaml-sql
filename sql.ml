@@ -225,29 +225,36 @@ let insert_get_first_col ~conn ~tbl ~tuples =
   let result = exec_exn ~conn ~query:(insert ^ ";" ^ select) in
   get_first_entry_exn ~result
 
-let ensure_inserted_get_first_col ~conn ~tbl ~tuples =
-  match !mode with
-  | Debug ->
-    debug (sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples));
-    "-1"
-  | Live ->
-    let result = select_exn ~conn ~tbl ~tuples in
-    match result#ntuples with
-    | 0 -> insert_get_first_col ~conn ~tbl ~tuples
-    | 1 -> get_first_entry_exn ~result
-    | _ -> failwith "More than one row matches query."
-
-let ensure_inserted_get_id ~conn ~tbl ~tuples =
-  int_of_string (ensure_inserted_get_first_col ~conn ~tbl ~tuples)
-
-let ensure_inserted ~conn ~tbl ~tuples =
-  ignore (ensure_inserted_get_first_col ~conn ~tbl ~tuples)
-
 let combine_cond_and_set_tuples ~tuples_cond ~tuples_set =
   let names_set = List.map fst tuples_set in
   let tuples_cond_filtered =
     List.filter (fun (n, _) -> not (List.mem n names_set)) tuples_cond in
   tuples_cond_filtered @ tuples_set
+
+let ensure_inserted_get_first_col ~conn ~tbl ~tuples_cond ~tuples_set =
+  let tuples = combine_cond_and_set_tuples ~tuples_cond ~tuples_set in
+  match !mode with
+  | Debug ->
+    debug (sprintf "%-25s: %s" tbl (sql_set_of_tuples ~conn ~tbl ~tuples));
+    "-1"
+  | Live ->
+    let result = select_exn ~conn ~tbl ~tuples:tuples_cond in
+    match result#ntuples with
+    | 0 -> insert_get_first_col ~conn ~tbl ~tuples
+    | 1 -> get_first_entry_exn ~result
+    | _ -> failwith "More than one row matches query."
+
+let condisset_ensure_inserted_get_id ~conn ~tbl ~tuples =
+  int_of_string (ensure_inserted_get_first_col ~conn ~tbl ~tuples_cond:tuples ~tuples_set:tuples)
+
+let condisset_ensure_inserted ~conn ~tbl ~tuples =
+  ignore (ensure_inserted_get_first_col ~conn ~tbl ~tuples_cond:tuples ~tuples_set:tuples)
+
+let ensure_inserted_get_id ~conn ~tbl ~tuples_cond ~tuples_set =
+  int_of_string (ensure_inserted_get_first_col ~conn ~tbl ~tuples_cond ~tuples_set)
+
+let ensure_inserted ~conn ~tbl ~tuples_cond ~tuples_set =
+  ignore (ensure_inserted_get_first_col ~conn ~tbl ~tuples_cond ~tuples_set)
 
 let insert_or_update ~conn ~tbl ~tuples_cond ~tuples_set =
   match !mode with
@@ -258,9 +265,7 @@ let insert_or_update ~conn ~tbl ~tuples_cond ~tuples_set =
     let result = select_exn ~conn ~tbl ~tuples:tuples_cond in
     match result#ntuples with
     | 1 -> update_entry ~conn ~tbl ~tuples_cond ~tuples_set
-    | 0 ->
-      let tuples = combine_cond_and_set_tuples ~tuples_cond ~tuples_set in
-      ensure_inserted ~conn ~tbl ~tuples
+    | 0 -> ensure_inserted ~conn ~tbl ~tuples_cond ~tuples_set
     | _ -> failwith "More than one row matches query."
 
 let get_col ~result ~col =
