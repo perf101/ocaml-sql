@@ -147,7 +147,7 @@ let string_of_value ~conn ~tbl ~col_name ~value =
   let ty = get_col_type ~conn ~tbl ~col_name in
   check_value ~ty ~value;
   match Type.is_quoted ty with
-  | false -> if value="None" then "NULL" else value
+  | false -> if value="None" || value="" then "NULL" else value
   | true -> "'" ^ (conn#escape_string value) ^ "'"
 
 let sql_values_of_tuples ~conn ~tbl ~tuples =
